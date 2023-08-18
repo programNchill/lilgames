@@ -9,7 +9,7 @@ const NB_SALT_ROUNDS = 5
 const hasher = (password: string) => bcrypt.hash(password, NB_SALT_ROUNDS);
 
 
-export type ValidatedUser = Omit<User, 'password_hash'>;
+export type ValidatedUser = Omit<User, 'passwordHash'>;
 
 @Injectable()
 export class AuthService {
@@ -20,15 +20,15 @@ export class AuthService {
 
   async validateUser(username: string, password: string): Promise<ValidatedUser | null> {
     const user = await this.usersService.findOneByUsername(username);
-    if (user && (await bcrypt.compare(password, user.password_hash))) {
-      const { password_hash, ...result } = user;
+    if (user && (await bcrypt.compare(password, user.passwordHash))) {
+      const { passwordHash, ...result } = user;
       return result;
     }
     return null;
   }
 
   async login(user: ValidatedUser) {
-    const payload = { username: user.username, sub: user.id };
+    const payload = { username: user.username, userId: user.id };
     
     return {
       access_token: this.jwtService.sign(payload),
