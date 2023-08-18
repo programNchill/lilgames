@@ -1,4 +1,4 @@
-import { Controller, Request as DecoratorRequest, Get, Post, UseGuards, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Request as DecoratorRequest, Get, Post, UseGuards, BadRequestException } from '@nestjs/common';
 import { LocalAuthGuard } from './auth/local-auth.guard';
 import { AuthService } from './auth/auth.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
