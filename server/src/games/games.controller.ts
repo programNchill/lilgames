@@ -3,7 +3,7 @@ import { Board, Player } from './tictactoe/tictactoe';
 
 @Controller('games')
 export class GamesController {
-  board = new Board<Player>();
+  board = new Board();
 
   @Get('test')
   getTest(): string {
@@ -14,7 +14,7 @@ export class GamesController {
     this.board.setState([
         O, X, O,
         O, O, X,
-        X, O, X 
+        X, O, O 
     ]);
 
     return this.board.someoneWon();

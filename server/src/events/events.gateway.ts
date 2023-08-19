@@ -7,8 +7,6 @@ import { SocketAuthMiddleware } from 'src/auth/ws-jwt/ws.mw';
 @WebSocketGateway({ namespace: 'events' })
 @UseGuards(WsJwtGuard)
 export class EventsGateway implements OnGatewayInit {
-
-
   afterInit(client: Socket) {
     client.use(SocketAuthMiddleware() as any);
   }
