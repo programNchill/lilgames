@@ -49,11 +49,7 @@ export class Board<T> {
       }
     }
 
-    if (!this.board.includes('empty')) {
-      return "draw";
-    } else {
-      return "no";
-    }
+    return !this.board.includes('empty') ? "draw":"no";
   }
 }
 
