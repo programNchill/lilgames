@@ -1,4 +1,4 @@
-import { Controller, Request as DecoratorRequest, Get, Post, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Request, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { User } from './users/user.entity';
 
@@ -12,7 +12,7 @@ export class AppController {
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@DecoratorRequest() req: {user: User}) {
+  getProfile(@Request() req: {user: User}) {
     return req.user;
   }
 
