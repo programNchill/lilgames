@@ -19,8 +19,7 @@ export class UsersService {
     // TODO: validate password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    const newUser = this.usersRepository.create({username, passwordHash: passwordHash});
-    await this.usersRepository.insert(newUser);
+    await this.usersRepository.insert(this.usersRepository.create({username, passwordHash}));
     return true;
   }
 

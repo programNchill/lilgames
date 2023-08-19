@@ -5,7 +5,7 @@ import { User } from './users/user.entity';
 @Controller()
 export class AppController {
 
-  @Get("lolwat")
+  @Get("test")
   getHello(): string {
     return "Hello lol";
   }
