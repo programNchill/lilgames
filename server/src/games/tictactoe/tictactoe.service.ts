@@ -1,32 +1,70 @@
 import { Injectable } from '@nestjs/common';
-import { Board } from './tictactoe';
 
-type GameId = number;
-type PlayerId = number; 
+export type Player = 'nought' | 'cross';
+type Position = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type Move = {
+  player: Player;
+  position: Position;
+};
+
+type Board = { [Key in Position]?: Player };
+
+type TictactoeData = {
+  board: Board;
+  currentPlayer: Player;
+  winner?: Player | 'draw';
+};
 
 @Injectable()
 export class TictactoeService {
-    nextGameId = 0;
-    games = new Map<GameId, Board>();
-    gamesId = new Map<PlayerId, GameId>();
+  name = 'tictactoe';
+  initialGameData(): [TictactoeData, TictactoeData] {
+    const player1 = Math.floor(Math.random() * 2);
+    const player2 = 1 - player1;
+    const choices: Player[] = ['nought', 'cross'];
 
-    startGame(playerId: PlayerId): GameId | null {
-        if (this.gamesId.has(playerId)) {
-            return null;
-        }
+    return [
+      { board: {}, currentPlayer: choices[player1] },
+      { board: {}, currentPlayer: choices[player2] },
+    ];
+  }
 
-        const newGameId = this.nextGameId++;
-        this.games.set(newGameId, new Board());
-        this.gamesId.set(playerId, newGameId);
-        return newGameId;
+  play(gameData: TictactoeData, { player, position }: Move): TictactoeData {
+    if (gameData.board[position]) {
+      return gameData;
     }
 
-    joinGame(playerId: PlayerId, gameId: GameId): boolean {
-        if (!this.games.has(gameId) || this.gamesId.has(playerId)) {
-            return false;
-        }
+    const board = { ...gameData.board, [position]: player };
+    const currentPlayer = gameData.currentPlayer == 'nought' ? 'cross' : 'nought';
+    return { board, currentPlayer, winner: this.someoneWon(board) };
+  }
 
-        this.gamesId.set(playerId, gameId);
-        return true;
+  someoneWon(board: Board): Player | 'draw' | undefined {
+    const reconstructedBoard = ([0, 1, 2, 3, 4, 5, 6, 7, 8] as Position[]).map((value) => board[value]);
+    const [a, b, c, d, e, f, g, h, i] = reconstructedBoard;
+    const rows = [
+      [a, b, c],
+      [d, e, f],
+      [g, h, i],
+    ];
+    const cols = [
+      [a, d, g],
+      [b, e, h],
+      [c, f, i],
+    ];
+    const diags = [
+      [a, e, i],
+      [c, e, g],
+    ];
+    const same = (line: (Player | undefined)[]) =>
+      line.reduce((previous, current) => (previous == current ? previous : undefined));
+    const results = [...rows.map(same), ...cols.map(same), ...diags.map(same)];
+    for (let result of results) {
+      if (result !== undefined) {
+        return result;
+      }
     }
+
+    return reconstructedBoard.includes(undefined) ? undefined : 'draw';
+  }
 }

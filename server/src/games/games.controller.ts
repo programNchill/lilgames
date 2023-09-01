@@ -1,22 +1,26 @@
-import { Controller, Get } from '@nestjs/common';
-import { Board, Player } from './tictactoe/tictactoe';
+import { BadRequestException, Controller, Get, Logger, Param, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { GamesService, GameId, PlayerId } from './games.service';
 
 @Controller('games')
 export class GamesController {
-  board = new Board();
+  constructor(private gameService: GamesService) {}
 
-  @Get('test')
-  getTest(): string {
-    const X = "cross";
-    const O = 'nought';
-    const E = 'empty';
+  // @UseGuards(JwtAuthGuard)
+  @Get(':gameName/:gameId?')
+  playGame(
+    @Param('gameName') gameName: string,
+    @Param('gameId') gameId?: string,
+  ): { gameId: GameId; playerId: PlayerId } {
+    if (!this.gameService.gameNameExists(gameName)) {
+      throw new BadRequestException(`${gameName} is not a supported game`);
+    }
 
-    this.board.setState([
-        O, X, O,
-        O, O, X,
-        X, O, O 
-    ]);
-
-    return this.board.someoneWon();
+    const joinData = this.gameService.join(gameId);
+    if (!joinData) {
+      throw new BadRequestException(`Couldn't join game with game id: ${gameId}`);
+    }
+    
+    return joinData;
   }
 }
