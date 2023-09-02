@@ -5,6 +5,7 @@ import { TictactoeService } from './tictactoe/tictactoe.service';
 
 @Module({
   providers: [GamesService, TictactoeService],
-  controllers: [GamesController]
+  controllers: [GamesController],
+  exports: [GamesService]
 })
 export class GamesModule {}

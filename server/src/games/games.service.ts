@@ -9,12 +9,14 @@ export type GameData = any;
 export class GamesService {
   nextGameId = 0;
   nextPlayerId = 0;
-  games = new Map<GameId, GameData>();
-  gamesId = new Map<PlayerId, GameId>();
   gameServices = new Map<string, TictactoeService>();
 
   constructor(private tictactoeService: TictactoeService) {
     this.gameServices.set(tictactoeService.name, tictactoeService);
+  }
+
+  gameIsFull(gameName: string, nbPlayers: number): boolean {
+    return this.gameServices.get(gameName)!.nbPlayer <= nbPlayers;
   }
 
   gameNameExists(name: string): boolean {

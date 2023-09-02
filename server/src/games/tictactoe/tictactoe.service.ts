@@ -12,31 +12,36 @@ type Board = { [Key in Position]?: Player };
 type TictactoeData = {
   board: Board;
   currentPlayer: Player;
+  ownPlayer?: number;
   winner?: Player | 'draw';
 };
 
 @Injectable()
 export class TictactoeService {
   name = 'tictactoe';
-  initialGameData(): [TictactoeData, TictactoeData] {
+  nbPlayer = 2;
+
+  initialGameData(playerId: number): unknown[] {
     const player1 = Math.floor(Math.random() * 2);
     const player2 = 1 - player1;
     const choices: Player[] = ['nought', 'cross'];
 
     return [
-      { board: {}, currentPlayer: choices[player1] },
-      { board: {}, currentPlayer: choices[player2] },
-    ];
+      { board: {}, currentPlayer: choices[player1], ownPlayer: playerId },
+      { board: {}, currentPlayer: choices[player2]},
+    ].sort(() => Math.random() - 0.5);
   }
 
-  play(gameData: TictactoeData, { player, position }: Move): TictactoeData {
+  play(gameDataUnknown: unknown, moveUnknown: unknown): unknown {
+    let gameData = gameDataUnknown as TictactoeData;
+    let {player, position} = moveUnknown as Move;
     if (gameData.board[position]) {
       return gameData;
     }
 
     const board = { ...gameData.board, [position]: player };
     const currentPlayer = gameData.currentPlayer == 'nought' ? 'cross' : 'nought';
-    return { board, currentPlayer, winner: this.someoneWon(board) };
+    return {...gameData, board, currentPlayer, winner: this.someoneWon(board) };
   }
 
   someoneWon(board: Board): Player | 'draw' | undefined {
