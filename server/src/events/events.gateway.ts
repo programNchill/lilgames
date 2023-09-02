@@ -15,6 +15,7 @@ import {
   throwError,
   combineLatest,
   of,
+  takeWhile,
 } from 'rxjs';
 import { Socket, Server } from 'socket.io';
 import { WsJwtGuard } from 'src/auth/ws-jwt/ws-jwt.guard';
@@ -73,39 +74,63 @@ export class EventsGateway implements OnGatewayInit {
       let gameService = this.gamesService.gameServices.get(gameName)!;
 
       const roomEmit = (data: unknown) => this.server.emit(roomId, data);
+      const cleanup = () => {
+        this.rooms.delete(roomId);
+      };
       // start
       roomEmit({ initialGameData: gameService.initialGameData(playerId) });
-      let statesValidation = updatedRoom.pipe(
+      let states = updatedRoom.pipe(
         filter((m) => 'verifyGameData' in m),
         tap((e) => Logger.log(`VERIFY ${JSON.stringify(e)}`)),
         bufferCount(gameService.nbPlayer),
-        map(([a,b]) =>{
+        map(([a, b]) => {
           // validate states here
-          if (false) {
-            roomEmit({ message: 'verifyGameData' })
-            throw new Error(`oop`);
+          if (!gameService.gameDataAgree([a.verifyGameData, b.verifyGameData])) {
+            roomEmit({ message: 'invalidGameData' });
+            return 'terminate';
           }
-          return a;
+          return a.verifyGameData;
         }),
-        retry()
+        takeWhile((e) => e !== 'terminate'),
       );
 
       let moves = updatedRoom.pipe(
-        filter((data) => 'move' in data),
-        tap((e) => {
+        filter((m) => 'move' in m),
+        tap((m) => {
           roomEmit({ message: 'verifyGameData' });
-          Logger.log(`MOVES ${JSON.stringify(e)}`);
+          Logger.log(`MOVE ${JSON.stringify(m)}`);
         }),
+        map((m) => m.move),
       );
 
-      let movesAndStates = combineLatest([moves, statesValidation])
+      let movesAndStates = combineLatest([moves, states])
         .pipe(
-          map(([moves, state]) => {
+          map(([move, state]) => {
             Logger.log(`COHERENT STATE ${JSON.stringify(state)}`);
-            return moves;
-          }), 
-          map(({ gameData, move }) => gameService.play(gameData, move)),
-          tap((gameData) => roomEmit({ gameData })),
+            return { move, state };
+          }),
+          map((moveAndState) => {
+            // validate states here
+            const { move, state } = moveAndState;
+            if (!gameService.canPlay(state, move)) {
+              roomEmit({ message: 'badMove' });
+              throw new Error(`oop`);
+            }
+            return moveAndState;
+          }),
+          retry(),
+          map(({ move, state }) => gameService.play(state, move)),
+
+          map((gameData) => {
+            if (gameService.someoneWon(gameData)) {
+              return 'done';
+            }
+            return gameData;
+          }),
+          takeWhile((e) => e !== 'done'),
+          tap(gameData => {
+            roomEmit({ gameData });
+          }),
         )
         .subscribe();
       // LOL WTF AM I DOING

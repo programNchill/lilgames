@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { deepStrictEqual } from 'assert';
 
 export type Player = 'nought' | 'cross';
 type Position = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -21,6 +22,16 @@ export class TictactoeService {
   name = 'tictactoe';
   nbPlayer = 2;
 
+  gameDataAgree(gameDataUnknown: unknown[]): boolean {
+    const same = gameDataUnknown
+      .map((d) => JSON.stringify(d))
+      .reduce((previous, current) =>
+        // no no no
+        previous === current ? previous : '',
+      );
+    return same !== '';
+  }
+
   initialGameData(playerId: number): unknown[] {
     const player1 = Math.floor(Math.random() * 2);
     const player2 = 1 - player1;
@@ -28,23 +39,27 @@ export class TictactoeService {
 
     return [
       { board: {}, currentPlayer: choices[player1], ownPlayer: playerId },
-      { board: {}, currentPlayer: choices[player2]},
+      { board: {}, currentPlayer: choices[player2] },
     ].sort(() => Math.random() - 0.5);
+  }
+
+  canPlay(gameDataUnknown: unknown, moveUnknown: unknown): boolean {
+    let { board } = gameDataUnknown as TictactoeData;
+    let { position } = moveUnknown as Move;
+    return board[position] === undefined;
   }
 
   play(gameDataUnknown: unknown, moveUnknown: unknown): unknown {
     let gameData = gameDataUnknown as TictactoeData;
-    let {player, position} = moveUnknown as Move;
-    if (gameData.board[position]) {
-      return gameData;
-    }
+    let { player, position } = moveUnknown as Move;
 
     const board = { ...gameData.board, [position]: player };
     const currentPlayer = gameData.currentPlayer == 'nought' ? 'cross' : 'nought';
-    return {...gameData, board, currentPlayer, winner: this.someoneWon(board) };
+    return { ...gameData, board, currentPlayer, winner: this.someoneWon(board) };
   }
 
-  someoneWon(board: Board): Player | 'draw' | undefined {
+  someoneWon(gameDataUnknown: unknown): Player | 'draw' | undefined {
+    const { board } = gameDataUnknown as TictactoeData;
     const reconstructedBoard = ([0, 1, 2, 3, 4, 5, 6, 7, 8] as Position[]).map((value) => board[value]);
     const [a, b, c, d, e, f, g, h, i] = reconstructedBoard;
     const rows = [
