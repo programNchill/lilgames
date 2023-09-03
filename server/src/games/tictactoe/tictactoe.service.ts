@@ -32,14 +32,14 @@ export class TictactoeService {
     return same !== '';
   }
 
-  initialGameData(playerId: number): unknown[] {
+  initialGameData(playerId: number): Record<string, unknown>[] {
     const player1 = Math.floor(Math.random() * 2);
     const player2 = 1 - player1;
     const choices: Player[] = ['nought', 'cross'];
 
     return [
-      { board: {}, currentPlayer: choices[player1], ownPlayer: playerId },
-      { board: {}, currentPlayer: choices[player2] },
+      { board: {}, currentPlayer: choices[player1], playerType:choices[player1], ownPlayer: playerId },
+      { board: {}, currentPlayer: choices[player1], playerType:choices[player2],},
     ].sort(() => Math.random() - 0.5);
   }
 
@@ -49,7 +49,7 @@ export class TictactoeService {
     return board[position] === undefined;
   }
 
-  play(gameDataUnknown: unknown, moveUnknown: unknown): unknown {
+  play(gameDataUnknown: Record<string, unknown>, moveUnknown: Record<string, unknown>): Record<string, unknown> {
     let gameData = gameDataUnknown as TictactoeData;
     let { player, position } = moveUnknown as Move;
 
@@ -58,9 +58,8 @@ export class TictactoeService {
     return { ...gameData, board, currentPlayer, winner: this.someoneWon(board) };
   }
 
-  someoneWon(gameDataUnknown: unknown): Player | 'draw' | undefined {
-    const { board } = gameDataUnknown as TictactoeData;
-    const reconstructedBoard = ([0, 1, 2, 3, 4, 5, 6, 7, 8] as Position[]).map((value) => board[value]);
+  someoneWon(board: Board): Player | 'draw' | undefined {
+    const reconstructedBoard = ([0, 1, 2, 3, 4, 5, 6, 7, 8] as Position[]).map((value) => value in board ? board[value] : undefined);
     const [a, b, c, d, e, f, g, h, i] = reconstructedBoard;
     const rows = [
       [a, b, c],
