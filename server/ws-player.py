@@ -86,27 +86,30 @@ def handle_all(data):
 def pretty_print_board(board):
     toXO = lambda x: 'X' if x == 'cross' else 'O' 
     symbols = [toXO(board[str(x)]) if str(x) in board else ' ' for x in range(9)]
-
+    print()
     for j in range(3):
         print("|".join(symbols[j*3:(j+1)*3]))
         if j == 2:
             break
         print("-"*5)
+    print()
 
 
 def handle_new_data(gameData):
     match gameData:
         case {"winner": x} if x is not None:
             print(f"Game over with result: {x}")
+            pretty_print_board(gameData["board"])
             sio.disconnect()
         case x:
             global myGameData
             global playerType
             myGameData = x
-            print(gameData)
             pretty_print_board(myGameData["board"])
             if myGameData["currentPlayer"] == playerType:
                 play_move()
+            else:
+                print("Opponent's turn")
         
 
 def handle_message(message):
