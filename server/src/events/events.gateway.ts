@@ -124,6 +124,9 @@ export class EventsGateway implements OnGatewayInit {
           tap((gameData) => {
             Logger.log(`NEW STATE ${JSON.stringify(gameData)}`);
             roomEmit({ gameData });
+            if (gameData?.winner !== undefined) {
+              cleanup();
+            }
           }),
           takeWhile((e) => e?.winner === undefined),
         )
