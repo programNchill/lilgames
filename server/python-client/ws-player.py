@@ -129,8 +129,7 @@ def handle_message(message):
 @sio.event
 def disconnect():
     print(f'{player=} disconnected from server')
-    sio.disconnect()
 
-# sio.connect('ws://localhost:3000')
-sio.connect('https://test-lilgames.onrender.com')
+sio.connect('ws://localhost:3000')
+# sio.connect('https://test-lilgames.onrender.com')
 sio.wait()

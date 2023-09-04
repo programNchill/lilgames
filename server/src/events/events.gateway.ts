@@ -19,20 +19,22 @@ import {
   sample,
   distinct,
   zip,
+  Subject,
 } from 'rxjs';
 import { Socket, Server } from 'socket.io';
 import { WsJwtGuard } from 'src/auth/ws-jwt/ws-jwt.guard';
 import { SocketAuthMiddleware } from 'src/auth/ws-jwt/ws.mw';
 import { GamesService } from 'src/games/games.service';
 
-type Room = string;
+type InputStream = Observable<Record<string, unknown>>;
+type OutputSteam = Subject<unknown>;
 
 @WebSocketGateway({ namespace: '/' })
 // @UseGuards(WsJwtGuard)
 export class EventsGateway implements OnGatewayInit {
   @WebSocketServer()
   server: Server;
-  rooms = new Map<string, [number, Observable<Record<string, unknown>>]>();
+  rooms = new Map<string, [number, InputStream, OutputSteam]>();
   constructor(private gamesService: GamesService) {}
 
   afterInit(client: Socket) {
@@ -51,34 +53,37 @@ export class EventsGateway implements OnGatewayInit {
   ) {
     const roomId = `${gameName}-${gameId}`;
     const maybeRoom = this.rooms.get(roomId);
-    let [nbPlayer, room] = maybeRoom ? maybeRoom : [0, EMPTY];
+    let [nbPlayer, inputStream, outputStream] = maybeRoom ? maybeRoom : [0, EMPTY, new Subject() as OutputSteam];
     const gameIsAlreadyFull = this.gamesService.gameIsFull(gameName, nbPlayer);
     if (gameIsAlreadyFull) {
       client.send('Game already full');
       return;
     }
 
-    const newPlayer = new Observable<Record<string, unknown>>((subscriber) => {
-      const listener = (data: Record<string, unknown>) => {
-        subscriber.next(data);
-      };
+    const outputStreamSubscription = outputStream.subscribe(makeClientSender(client, roomId));
+    const roomEmit = (data: unknown) => outputStream.next(data);
+    const cleanup = () => {
+      Logger.log(`cleanup player ${playerId}`);
+      const [nbPlayerr, ...rest] = this.rooms.get(roomId)!;
+      outputStreamSubscription.unsubscribe();
+      this.rooms.set(roomId, [nbPlayerr - 1, ...rest]);
+      if (nbPlayerr == 1) {
+        Logger.log(`total cleanup. remove room ${roomId}`);
+        roomEmit('disconnect');
+        this.rooms.delete(roomId);
+      }
+    };
 
-      client.on(roomId, listener);
-      return () => client.off(roomId, listener);
-    });
-    const updatedRoom = merge(room, newPlayer);
-    this.rooms.set(roomId, [++nbPlayer, updatedRoom]);
+    const updatedInputStream = merge(inputStream, makePlayerInputStream(client, roomId, cleanup));
+    this.rooms.set(roomId, [++nbPlayer, updatedInputStream, outputStream]);
+
     if (this.gamesService.gameIsFull(gameName, nbPlayer)) {
-      // TODO: create super fancy code that's too fancy for nothing
       let gameService = this.gamesService.gameServices.get(gameName)!;
 
-      const roomEmit = (data: unknown) => this.server.emit(roomId, data);
-      const cleanup = () => {
-        this.rooms.delete(roomId);
-      };
       // start
       roomEmit({ initialGameData: gameService.initialGameData(playerId) });
-      let states = updatedRoom.pipe(
+
+      let states = updatedInputStream.pipe(
         filter((m) => 'verifyGameData' in m),
         tap((e) => Logger.log(`RECEIVED VERIFY ${JSON.stringify(e)}`)),
         bufferCount(gameService.nbPlayer),
@@ -86,16 +91,15 @@ export class EventsGateway implements OnGatewayInit {
           // validate states here
           if (!gameService.gameDataAgree([a.verifyGameData, b.verifyGameData])) {
             roomEmit({ message: 'invalidGameData' });
-            cleanup();
             return 'terminate';
           }
           return a.verifyGameData;
         }),
         takeWhile((e) => e !== 'terminate'),
-        map(e => e as Record<string, unknown>),
+        map((e) => e as Record<string, unknown>),
       );
-      
-      let moves = updatedRoom.pipe(
+
+      let moves = updatedInputStream.pipe(
         filter((m) => 'move' in m),
         tap((m) => {
           roomEmit({ message: 'verifyGameData' });
@@ -104,7 +108,7 @@ export class EventsGateway implements OnGatewayInit {
         map((m) => m.move as Record<string, unknown>),
       );
 
-      zip(moves, states, (a,b) => [a,b])
+      zip(moves, states, (a, b) => [a, b])
         .pipe(
           map(([move, state]) => {
             Logger.log(`COHERENT STATE ${JSON.stringify(state)}`);
@@ -124,9 +128,6 @@ export class EventsGateway implements OnGatewayInit {
           tap((gameData) => {
             Logger.log(`NEW STATE ${JSON.stringify(gameData)}`);
             roomEmit({ gameData });
-            if (gameData?.winner !== undefined) {
-              cleanup();
-            }
           }),
           takeWhile((e) => e?.winner === undefined),
         )
@@ -135,3 +136,25 @@ export class EventsGateway implements OnGatewayInit {
     }
   }
 }
+
+const makeClientSender = (client: Socket, roomId: string) => (data: unknown) => {
+  if (client.disconnected) {
+    return;
+  }
+
+  if (data === 'disconnect') {
+    client.removeAllListeners();
+    client.disconnect();
+    return;
+  }
+  client.emit(roomId, data);
+};
+
+const makePlayerInputStream = (client: Socket, roomId: string, cleanup: () => void) =>
+  new Observable<Record<string, unknown>>((subscriber) => {
+    const dataForwarder = (data: Record<string, unknown>) => {
+      subscriber.next(data);
+    };
+    client.on(roomId, dataForwarder);
+    client.on('disconnecting', cleanup);
+  });
