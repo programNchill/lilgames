@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { User } from './user.entity';
-import { InjectRepository } from '@nestjs/typeorm';
+import { User, Users } from '../schema/user';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './users.dto';
+import { DatabaseService } from 'src/database/database.service';
+import { eq } from 'drizzle-orm';
+
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    private databaseService: DatabaseService,
   ) {}
 
   async create({username, password}: CreateUserDto): Promise<boolean> {
@@ -19,23 +19,25 @@ export class UsersService {
     // TODO: validate password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    await this.usersRepository.insert(this.usersRepository.create({username, passwordHash}));
+    await this.databaseService.db.insert(Users).values({username, passwordHash});
     return true;
   }
 
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async findAll(): Promise<User[]> {
+    return await this.databaseService.db.select().from(Users).all();
   }
 
-  findOneByUsername(username: string): Promise<User | null> {
-    return this.usersRepository.findOneBy({ username });
+  async findOneByUsername(username: string): Promise<User | null> {
+    const maybeUser = await this.databaseService.db.select().from(Users).where(eq(Users.username, username)).limit(1);
+    return maybeUser ? maybeUser[0] : null;
   }
 
-  findOneById(id: number): Promise<User | null> {
-    return this.usersRepository.findOneBy({ id });
+  async findOneById(id: number): Promise<User | null> {
+    const maybeUser = await this.databaseService.db.select().from(Users).where(eq(Users.id, id)).limit(1);
+    return maybeUser ? maybeUser[0] : null;
   }
 
   async remove(id: number): Promise<void> {
-    await this.usersRepository.delete(id);
+    await this.databaseService.db.delete(Users).where(eq(Users.id, id));
   }
 }

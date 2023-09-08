@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {  UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from 'src/users/user.entity';
+import { User } from 'src/schema/user';
 
 // TODO: user a real hasher
 const NB_SALT_ROUNDS = 5
