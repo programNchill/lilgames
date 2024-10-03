@@ -41,6 +41,16 @@ export class EventsGateway implements OnGatewayInit {
     // client.use(SocketAuthMiddleware() as any);
   }
 
+  gameDataAgree(gameDataUnknown: unknown[]): boolean {
+    const same = gameDataUnknown
+      .map((d) => JSON.stringify(d))
+      .reduce((previous, current) =>
+        // no no no
+        previous === current ? previous : '',
+      );
+    return same !== '';
+  }
+
   @SubscribeMessage('message')
   handleMessage(client: Socket, data: string): string {
     return 'Hello world!';
@@ -64,10 +74,11 @@ export class EventsGateway implements OnGatewayInit {
     const roomEmit = (data: unknown) => outputStream.next(data);
     const cleanup = () => {
       Logger.log(`cleanup player ${playerId}`);
-      const [nbPlayerr, ...rest] = this.rooms.get(roomId)!;
+      let [nbPlayerr, ...rest] = this.rooms.get(roomId)!;
       outputStreamSubscription.unsubscribe();
-      this.rooms.set(roomId, [nbPlayerr - 1, ...rest]);
-      if (nbPlayerr == 1) {
+      nbPlayerr--;
+      this.rooms.set(roomId, [nbPlayerr, ...rest]);
+      if (nbPlayerr === 0) {
         Logger.log(`total cleanup. remove room ${roomId}`);
         roomEmit('disconnect');
         this.rooms.delete(roomId);
@@ -87,13 +98,13 @@ export class EventsGateway implements OnGatewayInit {
         filter((m) => 'verifyGameData' in m),
         tap((e) => Logger.log(`RECEIVED VERIFY ${JSON.stringify(e)}`)),
         bufferCount(gameService.nbPlayer),
-        map(([a, b]) => {
+        map((verifyDatas) => {
           // validate states here
-          if (!gameService.gameDataAgree([a.verifyGameData, b.verifyGameData])) {
+          if (!this.gameDataAgree(verifyDatas.map(a => a.verifyGameData))) {
             roomEmit({ message: 'invalidGameData' });
             return 'terminate';
           }
-          return a.verifyGameData;
+          return verifyDatas[0].verifyGameData;
         }),
         takeWhile((e) => e !== 'terminate'),
         map((e) => e as Record<string, unknown>),

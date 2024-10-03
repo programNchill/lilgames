@@ -1,18 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { TictactoeService } from './tictactoe/tictactoe.service';
+import { Connect4Service } from './connect4/connect4.service';
 
 export type GameId = number;
 export type PlayerId = number;
 export type GameData = any;
 
+export interface GameImpl {
+  name: string;
+  nbPlayer: number;
+
+  initialGameData(playerId: number): Record<string, unknown>[];
+  canPlay(gameData: unknown, move: unknown): boolean;
+  play(gameData: Record<string, unknown>, move: Record<string, unknown>): Record<string, unknown>;
+  someoneWon(board: unknown): string | 'draw' | undefined;
+}
+
 @Injectable()
 export class GamesService {
   nextGameId = 0;
   nextPlayerId = 0;
-  gameServices = new Map<string, TictactoeService>();
+  gameServices = new Map<string, GameImpl>();
 
-  constructor(private tictactoeService: TictactoeService) {
+  constructor(private tictactoeService: TictactoeService, private connect4Service: Connect4Service) {
     this.gameServices.set(tictactoeService.name, tictactoeService);
+    this.gameServices.set(connect4Service.name, connect4Service);
   }
 
   gameIsFull(gameName: string, nbPlayers: number): boolean {

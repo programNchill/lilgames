@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { deepStrictEqual } from 'assert';
 
 export type Player = 'nought' | 'cross';
 type Position = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -17,20 +16,11 @@ type TictactoeData = {
   winner?: Player | 'draw';
 };
 
+
 @Injectable()
 export class TictactoeService {
   name = 'tictactoe';
   nbPlayer = 2;
-
-  gameDataAgree(gameDataUnknown: unknown[]): boolean {
-    const same = gameDataUnknown
-      .map((d) => JSON.stringify(d))
-      .reduce((previous, current) =>
-        // no no no
-        previous === current ? previous : '',
-      );
-    return same !== '';
-  }
 
   initialGameData(playerId: number): Record<string, unknown>[] {
     const player1 = Math.floor(Math.random() * 2);

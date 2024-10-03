@@ -2,16 +2,22 @@ import socketio
 import sys
 
 
-player = sys.argv[1]
+gameName = sys.argv[1]
+player = sys.argv[2]
+gameId = sys.argv[3]
+
+if gameName not in ["connect4", "tictactoe"]: raise "BAD GAME NAME!"
+
+
 playerType = None
 myGameData = None
 sio = socketio.Client(handle_sigint=True)
-gameName = "tictactoe"
-gameId = "a"
 roomId = f'{gameName}-{gameId}'
 
+max_position = 6 if gameName == "connect4" else 8
+
 def play_move():
-    position = input("Give a pos 0 to 8: ")
+    position = input(f"Give a pos 0 to {max_position}: ")
     global playerType
     sio.emit(roomId, 
     {
@@ -83,7 +89,33 @@ def handle_all(data):
             handle_message(message)
 
 
-def pretty_print_board(board):
+def pretty_print_board_connect4(board):
+    # Define the dimensions of the board
+    num_rows = 6
+    num_cols = 7
+    
+    # Create a 2D grid to represent the board visually
+    grid = [[" " for _ in range(num_cols)] for _ in range(num_rows)]
+    
+    # Fill the grid based on the board data
+    for x, col in board.items():
+        for y, player in col.items():
+            y = int(y)
+            x = int(x)
+            if player == 'first':
+                grid[5 - y][x] = 'X'  # 'X' for 'first' player
+            elif player == 'second':
+                grid[5 - y][x] = 'O'  # 'O' for 'second' player
+
+    # Print the board row by row
+    for row in grid[::-1]:
+        print("| " + " | ".join(row) + " |")
+
+    # Print the column indices at the bottom
+    print("  " + "   ".join(str(i) for i in range(num_cols)))
+
+
+def pretty_print_board_tictactoe(board):
     toXO = lambda x: 'X' if x == 'cross' else 'O' 
     symbols = [toXO(board[str(x)]) if str(x) in board else ' ' for x in range(9)]
     print()
@@ -95,17 +127,20 @@ def pretty_print_board(board):
     print()
 
 
+pp_board = pretty_print_board_connect4 if gameName == "connect4" else pretty_print_board_tictactoe
+
+
 def handle_new_data(gameData):
     match gameData:
         case {"winner": x} if x is not None:
             print(f"Game over with result: {x}")
-            pretty_print_board(gameData["board"])
+            pp_board(gameData["board"])
             sio.disconnect()
         case x:
             global myGameData
             global playerType
             myGameData = x
-            pretty_print_board(myGameData["board"])
+            pp_board(myGameData["board"])
             if myGameData["currentPlayer"] == playerType:
                 play_move()
             else:
@@ -133,3 +168,5 @@ def disconnect():
 sio.connect('ws://localhost:3000')
 # sio.connect('https://test-lilgames.onrender.com')
 sio.wait()
+
+
