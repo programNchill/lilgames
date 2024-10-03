@@ -1,10 +1,10 @@
 import { BadRequestException, Controller, Get, Logger, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { GamesService, GameId, PlayerId } from './games.service';
+import { GameRegistryService, GameId, PlayerId } from './gameregistry.service';
 
 @Controller('games')
-export class GamesController {
-  constructor(private gameService: GamesService) {}
+export class GameRegistryController {
+  constructor(private gameService: GameRegistryService) {}
 
   // @UseGuards(JwtAuthGuard)
   @Get(':gameName/:gameId?')

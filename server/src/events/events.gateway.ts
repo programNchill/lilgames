@@ -24,7 +24,7 @@ import {
 import { Socket, Server } from 'socket.io';
 import { WsJwtGuard } from 'src/auth/ws-jwt/ws-jwt.guard';
 import { SocketAuthMiddleware } from 'src/auth/ws-jwt/ws.mw';
-import { GamesService } from 'src/games/games.service';
+import { GameImpl, GameRegistryService } from 'src/gameregistry/gameregistry.service';
 
 type InputStream = Observable<Record<string, unknown>>;
 type OutputSteam = Subject<unknown>;
@@ -35,7 +35,7 @@ export class EventsGateway implements OnGatewayInit {
   @WebSocketServer()
   server: Server;
   rooms = new Map<string, [number, InputStream, OutputSteam]>();
-  constructor(private gamesService: GamesService) {}
+  constructor(private gameregistry: GameRegistryService) {}
 
   afterInit(client: Socket) {
     // client.use(SocketAuthMiddleware() as any);
@@ -64,8 +64,7 @@ export class EventsGateway implements OnGatewayInit {
     const roomId = `${gameName}-${gameId}`;
     const maybeRoom = this.rooms.get(roomId);
     let [nbPlayer, inputStream, outputStream] = maybeRoom ? maybeRoom : [0, EMPTY, new Subject() as OutputSteam];
-    const gameIsAlreadyFull = this.gamesService.gameIsFull(gameName, nbPlayer);
-    if (gameIsAlreadyFull) {
+    if (this.gameregistry.gameIsFull(gameName, nbPlayer)) {
       client.send('Game already full');
       return;
     }
@@ -88,64 +87,71 @@ export class EventsGateway implements OnGatewayInit {
     const updatedInputStream = merge(inputStream, makePlayerInputStream(client, roomId, cleanup));
     this.rooms.set(roomId, [++nbPlayer, updatedInputStream, outputStream]);
 
-    if (this.gamesService.gameIsFull(gameName, nbPlayer)) {
-      let gameService = this.gamesService.gameServices.get(gameName)!;
-
-      // start
-      roomEmit({ initialGameData: gameService.initialGameData(playerId) });
-
-      let states = updatedInputStream.pipe(
-        filter((m) => 'verifyGameData' in m),
-        tap((e) => Logger.log(`RECEIVED VERIFY ${JSON.stringify(e)}`)),
-        bufferCount(gameService.nbPlayer),
-        map((verifyDatas) => {
-          // validate states here
-          if (!this.gameDataAgree(verifyDatas.map(a => a.verifyGameData))) {
-            roomEmit({ message: 'invalidGameData' });
-            return 'terminate';
-          }
-          return verifyDatas[0].verifyGameData;
-        }),
-        takeWhile((e) => e !== 'terminate'),
-        map((e) => e as Record<string, unknown>),
-      );
-
-      let moves = updatedInputStream.pipe(
-        filter((m) => 'move' in m),
-        tap((m) => {
-          roomEmit({ message: 'verifyGameData' });
-          Logger.log(`RECEIVED MOVE ${JSON.stringify(m)}`);
-        }),
-        map((m) => m.move as Record<string, unknown>),
-      );
-
-      zip(moves, states, (a, b) => [a, b])
-        .pipe(
-          map(([move, state]) => {
-            Logger.log(`COHERENT STATE ${JSON.stringify(state)}`);
-            return { move, state };
-          }),
-          map((moveAndState) => {
-            // validate play here
-            const { move, state } = moveAndState;
-            if (!gameService.canPlay(state, move)) {
-              roomEmit({ message: 'badMove' });
-              throw new Error(`oop`);
-            }
-            return moveAndState;
-          }),
-          retry(),
-          map(({ move, state }) => gameService.play(state as Record<string, unknown>, move)),
-          tap((gameData) => {
-            Logger.log(`NEW STATE ${JSON.stringify(gameData)}`);
-            roomEmit({ gameData });
-          }),
-          takeWhile((e) => e?.winner === undefined),
-        )
-        .subscribe();
-      // LOL WTF AM I DOING
+    if (this.gameregistry.gameIsFull(gameName, nbPlayer)) {
+      this.startGame(updatedInputStream, this.gameregistry.gameServices.get(gameName)!, roomEmit, playerId);
     }
   }
+
+  private startGame(
+    updatedInputStream: Observable<Record<string, unknown>>,
+    gameService: GameImpl,
+    roomEmit: (data: unknown) => void,
+    playerId: number,
+  ) {
+    roomEmit({ initialGameData: gameService.initialGameData(playerId).sort(() => Math.random() - 0.5) });
+
+    let states = updatedInputStream.pipe(
+      filter((m) => 'verifyGameData' in m),
+      tap((e) => Logger.log(`RECEIVED VERIFY ${JSON.stringify(e)}`)),
+      bufferCount(gameService.nbPlayer),
+      map((verifyDatas) => {
+        // validate states here
+        if (!this.gameDataAgree(verifyDatas.map((a) => a.verifyGameData))) {
+          roomEmit({ message: 'invalidGameData' });
+          return 'terminate';
+        }
+        return verifyDatas[0].verifyGameData;
+      }),
+      takeWhile((e) => e !== 'terminate'),
+      map((e) => e as Record<string, unknown>),
+    );
+
+    let moves = updatedInputStream.pipe(
+      filter((m) => 'move' in m),
+      tap((m) => {
+        roomEmit({ message: 'verifyGameData' });
+        Logger.log(`RECEIVED MOVE ${JSON.stringify(m)}`);
+      }),
+      map((m) => m.move as Record<string, unknown>),
+    );
+
+    zip(moves, states, (a, b) => [a, b])
+      .pipe(
+        map(([move, state]) => {
+          Logger.log(`COHERENT STATE ${JSON.stringify(state)}`);
+          return { move, state };
+        }),
+        map((moveAndState) => {
+          // validate play here
+          const { move, state } = moveAndState;
+          if (!gameService.canPlay(state, move)) {
+            roomEmit({ message: 'badMove' });
+            throw new Error(`oop`);
+          }
+          return moveAndState;
+        }),
+        retry(),
+        map(({ move, state }) => gameService.play(state as Record<string, unknown>, move)),
+        tap((gameData) => {
+          Logger.log(`NEW STATE ${JSON.stringify(gameData)}`);
+          roomEmit({ gameData });
+        }),
+        takeWhile((e) => e?.winner === undefined),
+      )
+      .subscribe();
+  }
+
+  sequence() {}
 }
 
 const makeClientSender = (client: Socket, roomId: string) => (data: unknown) => {

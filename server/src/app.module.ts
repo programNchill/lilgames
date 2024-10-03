@@ -5,7 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { User } from './schema/user';
 import { EventsModule } from './events/events.module';
-import { GamesModule } from './games/games.module';
+import { GameRegistryModule } from './gameregistry/gameregistry.module';
 import { DatabaseService } from './database/database.service';
 import { DatabaseModule } from './database/database.module';
 
@@ -15,7 +15,7 @@ import { DatabaseModule } from './database/database.module';
     AuthModule,
     UsersModule,
     EventsModule,
-    GamesModule,
+    GameRegistryModule,
   ],
   controllers: [AppController],
 })

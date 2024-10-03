@@ -7,7 +7,7 @@ export class AppController {
 
   @Get("test")
   getHello(): string {
-    return "Hello lol";
+    return "Hello World!";
   }
 
   @UseGuards(JwtAuthGuard)

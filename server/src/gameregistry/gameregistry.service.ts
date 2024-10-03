@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { TictactoeService } from './tictactoe/tictactoe.service';
-import { Connect4Service } from './connect4/connect4.service';
+import { connect4Game } from './games/connect4';
+import { tictactoeGame } from './games/tictactoe';
 
 export type GameId = number;
 export type PlayerId = number;
@@ -13,17 +13,18 @@ export interface GameImpl {
   initialGameData(playerId: number): Record<string, unknown>[];
   canPlay(gameData: unknown, move: unknown): boolean;
   play(gameData: Record<string, unknown>, move: Record<string, unknown>): Record<string, unknown>;
-  someoneWon(board: unknown): string | 'draw' | undefined;
 }
 
+const GAMES: GameImpl[] = [connect4Game, tictactoeGame];
+
 @Injectable()
-export class GamesService {
+export class GameRegistryService {
   nextGameId = 0;
   nextPlayerId = 0;
   gameServices = new Map<string, GameImpl>();
 
-  constructor(@Inject('GAMEIMPLS') private specificGameServices: GameImpl[]) {
-    for (let specificGameService of this.specificGameServices) {
+  constructor() {
+    for (let specificGameService of GAMES) {
       this.gameServices.set(specificGameService.name, specificGameService);
     }
   }

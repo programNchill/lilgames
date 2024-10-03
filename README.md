@@ -1,8 +1,11 @@
 # lilgames
 
 
+Turnbased games webapp communicating with websockets! Concensus verified distributed game state! 
 
 
+## Games to implement?
+checkers, chess, battleship, la battaille
 
 
 ## Server
