@@ -1,12 +1,52 @@
 import socketio
 import sys
-
+import os
 
 gameName = sys.argv[1]
 player = sys.argv[2]
 gameId = sys.argv[3]
 
 if gameName not in ["connect4", "tictactoe"]: raise "BAD GAME NAME!"
+
+def pretty_print_board_connect4(board):
+    # Define the dimensions of the board
+    num_rows = 6
+    num_cols = 7
+    
+    # Create a 2D grid to represent the board visually
+    grid = [[" " for _ in range(num_cols)] for _ in range(num_rows)]
+    
+    # Fill the grid based on the board data
+    for x, col in board.items():
+        for y, player in col.items():
+            y = int(y)
+            x = int(x)
+            if player == 'first':
+                grid[5 - y][x] = 'X'  # 'X' for 'first' player
+            elif player == 'second':
+                grid[5 - y][x] = 'O'  # 'O' for 'second' player
+
+    # Print the board row by row
+    for row in grid[::-1]:
+        print("| " + " | ".join(row) + " |")
+
+    # Print the column indices at the bottom
+    print("  " + "   ".join(str(i) for i in range(num_cols)))
+
+
+def pretty_print_board_tictactoe(board):
+    toXO = lambda x: 'X' if x == 'cross' else 'O' 
+    symbols = [toXO(board[str(x)]) if str(x) in board else ' ' for x in range(9)]
+    print()
+    for j in range(3):
+        print("|".join(symbols[j*3:(j+1)*3]))
+        if j == 2:
+            break
+        print("-"*5)
+    print()
+
+pp_board = pretty_print_board_connect4 if gameName == "connect4" else pretty_print_board_tictactoe
+
 
 
 playerType = None
@@ -51,7 +91,8 @@ async def message(data):
 
 @sio.on('initialGameData')
 def start_game(data):
-    print("starting game")
+    os.system('cls')
+    print("Starting game!")
 
     startingPlayerIdx = None
     for i, x in enumerate(data):
@@ -66,15 +107,17 @@ def start_game(data):
 
     if startingPlayer["ownPlayer"] == player:
         myGameData = startingPlayer
+        pp_board(myGameData["board"])
         playerType = myGameData["playerType"]
-        print(f"You are {playerType}")
+        print(f"You are first to go")
         del myGameData["ownPlayer"]
         del myGameData["playerType"]
         play_move()
     else:
         myGameData = secondPlayer
+        pp_board(myGameData["board"])
         playerType = myGameData["playerType"]
-        print(f"You are {playerType}")
+        print(f"You are not first to go. Wait for your turn.")
         del myGameData["playerType"]
 
 
@@ -89,56 +132,20 @@ def handle_all(data):
             handle_message(message)
 
 
-def pretty_print_board_connect4(board):
-    # Define the dimensions of the board
-    num_rows = 6
-    num_cols = 7
-    
-    # Create a 2D grid to represent the board visually
-    grid = [[" " for _ in range(num_cols)] for _ in range(num_rows)]
-    
-    # Fill the grid based on the board data
-    for x, col in board.items():
-        for y, player in col.items():
-            y = int(y)
-            x = int(x)
-            if player == 'first':
-                grid[5 - y][x] = 'X'  # 'X' for 'first' player
-            elif player == 'second':
-                grid[5 - y][x] = 'O'  # 'O' for 'second' player
-
-    # Print the board row by row
-    for row in grid[::-1]:
-        print("| " + " | ".join(row) + " |")
-
-    # Print the column indices at the bottom
-    print("  " + "   ".join(str(i) for i in range(num_cols)))
-
-
-def pretty_print_board_tictactoe(board):
-    toXO = lambda x: 'X' if x == 'cross' else 'O' 
-    symbols = [toXO(board[str(x)]) if str(x) in board else ' ' for x in range(9)]
-    print()
-    for j in range(3):
-        print("|".join(symbols[j*3:(j+1)*3]))
-        if j == 2:
-            break
-        print("-"*5)
-    print()
-
-
-pp_board = pretty_print_board_connect4 if gameName == "connect4" else pretty_print_board_tictactoe
-
-
 def handle_new_data(gameData):
+    global playerType
+    os.system('cls')
     match gameData:
         case {"winner": x} if x is not None:
-            print(f"Game over with result: {x}")
+            if x == playerType: 
+                print(f"You WON!")
+            else:
+                print(f"You LOST!")
+
             pp_board(gameData["board"])
             sio.disconnect()
         case x:
             global myGameData
-            global playerType
             myGameData = x
             pp_board(myGameData["board"])
             if myGameData["currentPlayer"] == playerType:
