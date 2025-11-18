@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { deepStrictEqual } from 'assert';
+import { GameServiceInterface } from '../game-service.interface';
 
 export type Player = 'nought' | 'cross';
 type Position = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -18,7 +19,7 @@ type TictactoeData = {
 };
 
 @Injectable()
-export class TictactoeService {
+export class TictactoeService implements GameServiceInterface {
   name = 'tictactoe';
   nbPlayer = 2;
 

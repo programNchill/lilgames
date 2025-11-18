@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
-import { TictactoeService } from 'src/games/tictactoe/tictactoe.service';
+import { GameServiceInterface } from 'src/games/game-service.interface';
 import { ClientMessage, MoveMessage, ServerMessage, VerifyGameDataMessage } from './message.types';
 
 interface Player {
@@ -27,7 +27,7 @@ export class GameRoom {
 
   constructor(
     public readonly roomId: string,
-    private readonly gameService: TictactoeService,
+    private readonly gameService: GameServiceInterface,
     private readonly maxPlayers: number,
   ) {}
 
