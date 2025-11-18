@@ -50,7 +50,17 @@ export class EventsGateway implements OnGatewayInit {
         return;
       }
 
-      room = new GameRoom(roomId, gameService, gameService.nbPlayer);
+      // Create room with cleanup callback
+      const onEmptyCallback = () => {
+        const roomToDelete = this.rooms.get(roomId);
+        if (roomToDelete) {
+          roomToDelete.destroy();
+          this.rooms.delete(roomId);
+          Logger.log(`Removed empty room ${roomId} from gateway`);
+        }
+      };
+
+      room = new GameRoom(roomId, gameService, gameService.nbPlayer, onEmptyCallback);
       this.rooms.set(roomId, room);
 
       Logger.log(`Created new room ${roomId}`);
@@ -64,6 +74,8 @@ export class EventsGateway implements OnGatewayInit {
     }
 
     // Add player to room
+    // Note: GameRoom handles disconnect internally via its own handlers
+    // The onEmptyCallback we provided will clean up the room from the gateway when it's empty
     const playerAdded = room.addPlayer(playerId, client);
 
     if (!playerAdded) {
@@ -71,19 +83,6 @@ export class EventsGateway implements OnGatewayInit {
       client.emit('error', 'Failed to join game');
       return;
     }
-
-    // Set up disconnect handler to clean up room
-    const disconnectHandler = () => {
-      const shouldDestroy = room!.removePlayer(playerId);
-
-      if (shouldDestroy) {
-        room!.destroy();
-        this.rooms.delete(roomId);
-        Logger.log(`Removed empty room ${roomId}`);
-      }
-    };
-
-    client.on('disconnecting', disconnectHandler);
 
     Logger.log(`Player ${playerId} successfully joined room ${roomId}`);
   }
