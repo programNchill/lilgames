@@ -1,10 +1,10 @@
-import type { Config } from "drizzle-kit";
- 
-export default {
+import { defineConfig } from "drizzle-kit";
+
+export default defineConfig({
   schema: "./src/schema/*",
   out: "./drizzle",
-  driver: 'turso',
+  dialect: 'sqlite',
   dbCredentials: {
     url: 'file:./local.db'
   }
-} satisfies Config;
+});
