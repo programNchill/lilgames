@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TictactoeService } from './tictactoe/tictactoe.service';
 import { Connect4Service } from './connect4/connect4.service';
+import { ChessService } from './chess/chess.service';
 import { GameServiceInterface } from './game-service.interface';
 
 export type GameId = number;
@@ -16,9 +17,11 @@ export class GamesService {
   constructor(
     private tictactoeService: TictactoeService,
     private connect4Service: Connect4Service,
+    private chessService: ChessService,
   ) {
     this.gameServices.set(tictactoeService.name, tictactoeService);
     this.gameServices.set(connect4Service.name, connect4Service);
+    this.gameServices.set(chessService.name, chessService);
   }
 
   gameIsFull(gameName: string, nbPlayers: number): boolean {
