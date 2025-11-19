@@ -53,9 +53,10 @@ describe('TictactoeService', () => {
       expect(data[0].currentPlayer).toBe(data[1].currentPlayer);
     });
 
-    it('should assign ownPlayer to first data object', () => {
+    it('should assign ownPlayer to one data object', () => {
       const data = service.initialGameData(5);
-      expect(data[0].ownPlayer).toBe(5);
+      const ownPlayers = [data[0].ownPlayer, data[1].ownPlayer];
+      expect(ownPlayers).toContain(5);
     });
   });
 

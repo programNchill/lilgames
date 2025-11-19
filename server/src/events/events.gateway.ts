@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
-import { GamesService } from 'src/games/games.service';
+import { GamesService } from '../games/games.service';
 import { GameRoom } from './game-room';
 import { JoinMessage } from './message.types';
 

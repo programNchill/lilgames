@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { User, Users } from '../schema/user';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './users.dto';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { eq } from 'drizzle-orm';
 
 
