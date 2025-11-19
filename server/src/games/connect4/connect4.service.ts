@@ -101,12 +101,56 @@ export class Connect4Service implements GameServiceInterface {
     // Switch player
     const currentPlayer = gameData.currentPlayer === 'red' ? 'yellow' : 'red';
 
+    // Optimized win check: only check around the last move
+    const winner = targetRow !== -1
+      ? this.checkWinAtPosition(board, targetRow, column, player)
+      : this.someoneWon(board);
+
     return {
       ...gameData,
       board,
       currentPlayer,
-      winner: this.someoneWon(board),
+      winner,
     };
+  }
+
+  // Optimized win detection: only check around the last placed piece
+  private checkWinAtPosition(board: Board, row: number, col: number, player: Player): Player | 'draw' | undefined {
+    // Check horizontal
+    let count = 1;
+    // Count left
+    for (let c = col - 1; c >= 0 && board[row][c] === player; c--) count++;
+    // Count right
+    for (let c = col + 1; c < this.COLS && board[row][c] === player; c++) count++;
+    if (count >= 4) return player;
+
+    // Check vertical
+    count = 1;
+    // Count down
+    for (let r = row - 1; r >= 0 && board[r][col] === player; r--) count++;
+    // Count up
+    for (let r = row + 1; r < this.ROWS && board[r][col] === player; r++) count++;
+    if (count >= 4) return player;
+
+    // Check diagonal (bottom-left to top-right)
+    count = 1;
+    // Count down-left
+    for (let r = row - 1, c = col - 1; r >= 0 && c >= 0 && board[r][c] === player; r--, c--) count++;
+    // Count up-right
+    for (let r = row + 1, c = col + 1; r < this.ROWS && c < this.COLS && board[r][c] === player; r++, c++) count++;
+    if (count >= 4) return player;
+
+    // Check diagonal (top-left to bottom-right)
+    count = 1;
+    // Count up-left
+    for (let r = row + 1, c = col - 1; r < this.ROWS && c >= 0 && board[r][c] === player; r++, c--) count++;
+    // Count down-right
+    for (let r = row - 1, c = col + 1; r >= 0 && c < this.COLS && board[r][c] === player; r--, c++) count++;
+    if (count >= 4) return player;
+
+    // Check for draw (board is full)
+    const isFull = board.every((row) => row.every((cell) => cell !== null));
+    return isFull ? 'draw' : undefined;
   }
 
   someoneWon(board: Board): Player | 'draw' | undefined {

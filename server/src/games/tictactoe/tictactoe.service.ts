@@ -23,6 +23,18 @@ export class TictactoeService implements GameServiceInterface {
   name = 'tictactoe';
   nbPlayer = 2;
 
+  // Bitboard win patterns for O(1) win checking
+  private readonly WIN_PATTERNS = [
+    0b000000111, // Row 1 (positions 0,1,2)
+    0b000111000, // Row 2 (positions 3,4,5)
+    0b111000000, // Row 3 (positions 6,7,8)
+    0b001001001, // Col 1 (positions 0,3,6)
+    0b010010010, // Col 2 (positions 1,4,7)
+    0b100100100, // Col 3 (positions 2,5,8)
+    0b100010001, // Diagonal (positions 0,4,8)
+    0b001010100, // Anti-diagonal (positions 2,4,6)
+  ];
+
   gameDataAgree(gameDataUnknown: unknown[]): boolean {
     const same = gameDataUnknown
       .map((d) => JSON.stringify(d))
@@ -60,31 +72,29 @@ export class TictactoeService implements GameServiceInterface {
   }
 
   someoneWon(board: Board): Player | 'draw' | undefined {
-    const reconstructedBoard = ([0, 1, 2, 3, 4, 5, 6, 7, 8] as Position[]).map((value) => value in board ? board[value] : undefined);
-    const [a, b, c, d, e, f, g, h, i] = reconstructedBoard;
-    const rows = [
-      [a, b, c],
-      [d, e, f],
-      [g, h, i],
-    ];
-    const cols = [
-      [a, d, g],
-      [b, e, h],
-      [c, f, i],
-    ];
-    const diags = [
-      [a, e, i],
-      [c, e, g],
-    ];
-    const same = (line: (Player | undefined)[]) =>
-      line.reduce((previous, current) => (previous == current ? previous : undefined));
-    const results = [...rows.map(same), ...cols.map(same), ...diags.map(same)];
-    for (let result of results) {
-      if (result !== undefined) {
-        return result;
+    // Convert board to bitboards for O(1) win checking
+    let noughtBits = 0;
+    let crossBits = 0;
+    let filledCount = 0;
+
+    for (let pos = 0; pos < 9; pos++) {
+      const player = board[pos as Position];
+      if (player === 'nought') {
+        noughtBits |= (1 << pos);
+        filledCount++;
+      } else if (player === 'cross') {
+        crossBits |= (1 << pos);
+        filledCount++;
       }
     }
 
-    return reconstructedBoard.includes(undefined) ? undefined : 'draw';
+    // Check for wins using bitwise operations (much faster than array checks)
+    for (const pattern of this.WIN_PATTERNS) {
+      if ((noughtBits & pattern) === pattern) return 'nought';
+      if ((crossBits & pattern) === pattern) return 'cross';
+    }
+
+    // Check for draw (all 9 positions filled)
+    return filledCount === 9 ? 'draw' : undefined;
   }
 }

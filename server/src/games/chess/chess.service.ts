@@ -31,6 +31,9 @@ export interface ChessData {
   lastMove?: Move;
   halfMoveClock?: number; // For 50-move rule
   moveHistory?: Move[];
+  // Cached king positions for performance
+  whiteKingPos?: Position;
+  blackKingPos?: Position;
 }
 
 @Injectable()
@@ -62,6 +65,8 @@ export class ChessService implements GameServiceInterface {
         ownPlayer: playerId,
         halfMoveClock: 0,
         moveHistory: [],
+        whiteKingPos: { row: 7, col: 4 },
+        blackKingPos: { row: 0, col: 4 },
       },
       {
         board: initialBoard,
@@ -69,6 +74,8 @@ export class ChessService implements GameServiceInterface {
         playerType: choices[player2],
         halfMoveClock: 0,
         moveHistory: [],
+        whiteKingPos: { row: 7, col: 4 },
+        blackKingPos: { row: 0, col: 4 },
       },
     ].sort(() => Math.random() - 0.5);
   }
@@ -120,6 +127,18 @@ export class ChessService implements GameServiceInterface {
 
     const moveHistory = [...(gameData.moveHistory || []), move];
 
+    // Update king position cache if king moved
+    let whiteKingPos = gameData.whiteKingPos;
+    let blackKingPos = gameData.blackKingPos;
+
+    if (piece && piece.type === 'king' && toPos) {
+      if (piece.player === 'white') {
+        whiteKingPos = toPos;
+      } else {
+        blackKingPos = toPos;
+      }
+    }
+
     const newGameData: ChessData = {
       ...gameData,
       board: newBoard,
@@ -127,6 +146,8 @@ export class ChessService implements GameServiceInterface {
       lastMove: move,
       halfMoveClock,
       moveHistory,
+      whiteKingPos,
+      blackKingPos,
     };
 
     // Check game status
@@ -488,7 +509,16 @@ export class ChessService implements GameServiceInterface {
     return newBoard;
   }
 
-  private findKing(board: (Piece | null)[][], player: Player): Position | null {
+  private findKing(board: (Piece | null)[][], player: Player, cachedPos?: Position): Position | null {
+    // Use cached position if available and valid
+    if (cachedPos) {
+      const piece = board[cachedPos.row]?.[cachedPos.col];
+      if (piece && piece.type === 'king' && piece.player === player) {
+        return cachedPos;
+      }
+    }
+
+    // Fallback to full board scan (for simulated boards or cache miss)
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const piece = board[row][col];
@@ -500,42 +530,82 @@ export class ChessService implements GameServiceInterface {
     return null;
   }
 
-  private isInCheck(board: (Piece | null)[][], player: Player): boolean {
-    const kingPos = this.findKing(board, player);
+  private isInCheck(board: (Piece | null)[][], player: Player, cachedKingPos?: Position): boolean {
+    const kingPos = this.findKing(board, player, cachedKingPos);
     if (!kingPos) return false;
 
     const opponent: Player = player === 'white' ? 'black' : 'white';
+    const { row: kRow, col: kCol } = kingPos;
 
-    // Check if any opponent piece can attack the king
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        const piece = board[row][col];
-        if (piece && piece.player === opponent) {
-          const from = { row, col };
+    // Check for pawn attacks (only 2 squares to check)
+    const pawnDir = player === 'white' ? -1 : 1;
+    for (const colOffset of [-1, 1]) {
+      const checkRow = kRow + pawnDir;
+      const checkCol = kCol + colOffset;
+      if (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+        const piece = board[checkRow][checkCol];
+        if (piece && piece.player === opponent && piece.type === 'pawn') {
+          return true;
+        }
+      }
+    }
 
-          // For pawns, only check diagonal attacks
-          if (piece.type === 'pawn') {
-            const direction = piece.player === 'white' ? -1 : 1;
-            const attackRow = row + direction;
-            if (
-              attackRow === kingPos.row &&
-              Math.abs(col - kingPos.col) === 1
-            ) {
-              return true;
-            }
-          } else {
-            // Create a minimal game data for validation
-            const tempGameData: ChessData = {
-              board,
-              currentPlayer: opponent,
-            };
+    // Check for knight attacks (8 possible positions)
+    const knightMoves = [
+      [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+      [1, -2], [1, 2], [2, -1], [2, 1]
+    ];
+    for (const [rowOffset, colOffset] of knightMoves) {
+      const checkRow = kRow + rowOffset;
+      const checkCol = kCol + colOffset;
+      if (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+        const piece = board[checkRow][checkCol];
+        if (piece && piece.player === opponent && piece.type === 'knight') {
+          return true;
+        }
+      }
+    }
 
-            // Check basic piece movement (without recursion on check detection)
-            if (this.canAttack(tempGameData, piece, from, kingPos)) {
-              return true;
-            }
+    // Check for king attacks (8 adjacent squares)
+    for (let rowOffset = -1; rowOffset <= 1; rowOffset++) {
+      for (let colOffset = -1; colOffset <= 1; colOffset++) {
+        if (rowOffset === 0 && colOffset === 0) continue;
+        const checkRow = kRow + rowOffset;
+        const checkCol = kCol + colOffset;
+        if (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+          const piece = board[checkRow][checkCol];
+          if (piece && piece.player === opponent && piece.type === 'king') {
+            return true;
           }
         }
+      }
+    }
+
+    // Check for sliding piece attacks (rook, bishop, queen) in 8 directions
+    const directions = [
+      [-1, 0], [1, 0], [0, -1], [0, 1],  // Rook directions
+      [-1, -1], [-1, 1], [1, -1], [1, 1]  // Bishop directions
+    ];
+
+    for (let i = 0; i < directions.length; i++) {
+      const [rowDir, colDir] = directions[i];
+      const isRookDirection = i < 4;
+
+      let checkRow = kRow + rowDir;
+      let checkCol = kCol + colDir;
+
+      while (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+        const piece = board[checkRow][checkCol];
+        if (piece) {
+          if (piece.player === opponent) {
+            if (piece.type === 'queen') return true;
+            if (isRookDirection && piece.type === 'rook') return true;
+            if (!isRookDirection && piece.type === 'bishop') return true;
+          }
+          break; // Stop at first piece
+        }
+        checkRow += rowDir;
+        checkCol += colDir;
       }
     }
 
@@ -594,7 +664,8 @@ export class ChessService implements GameServiceInterface {
     gameData: ChessData,
     currentPlayer: Player,
   ): Player | 'draw' | undefined {
-    const inCheck = this.isInCheck(gameData.board, currentPlayer);
+    const kingPos = currentPlayer === 'white' ? gameData.whiteKingPos : gameData.blackKingPos;
+    const inCheck = this.isInCheck(gameData.board, currentPlayer, kingPos);
     const hasLegalMoves = this.hasLegalMoves(gameData, currentPlayer);
 
     // Checkmate
