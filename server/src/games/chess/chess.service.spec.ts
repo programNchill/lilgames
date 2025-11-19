@@ -244,9 +244,8 @@ describe('ChessService', () => {
   describe('Bishop Movements', () => {
     it('should allow bishop to move diagonally', () => {
       const data = service.initialGameData(0)[0] as unknown as ChessData;
-      // Clear path
-      data.board[5][3] = null;
-      data.board[4][2] = null;
+      // Clear path - bishop at c1 [7][2] to e3 [5][4] needs d2 [6][3] clear
+      data.board[6][3] = null;
 
       const move: Move = { player: 'white', from: 'c1', to: 'e3' };
       expect(service.canPlay(data, move as any)).toBe(true);
@@ -263,7 +262,8 @@ describe('ChessService', () => {
     it('should not allow bishop to jump over pieces', () => {
       const data = service.initialGameData(0)[0] as unknown as ChessData;
       data.board[4][2] = { type: 'bishop', player: 'white' };
-      data.board[5][3] = { type: 'pawn', player: 'white' };
+      // Block path - c4 [4][2] to f7 [1][5] path includes d5 [3][3]
+      data.board[3][3] = { type: 'pawn', player: 'white' };
 
       const move: Move = { player: 'white', from: 'c4', to: 'f7' };
       expect(service.canPlay(data, move as any)).toBe(false);
@@ -311,8 +311,8 @@ describe('ChessService', () => {
       const data = service.initialGameData(0)[0] as unknown as ChessData;
       data.board[4][4] = { type: 'king', player: 'white' };
       data.board[7][4] = null;
-      // Black rook attacking e5
-      data.board[3][4] = { type: 'rook', player: 'black' };
+      // Black rook attacking e5 from a5 [3][0]
+      data.board[3][0] = { type: 'rook', player: 'black' };
 
       const move: Move = { player: 'white', from: 'e4', to: 'e5' };
       expect(service.canPlay(data, move as any)).toBe(false);
@@ -366,7 +366,9 @@ describe('ChessService', () => {
       const data = service.initialGameData(0)[0] as unknown as ChessData;
       data.board[7][5] = null;
       data.board[7][6] = null;
-      // Black rook attacking f1
+      // Black rook attacking f1 from f8 [0][5] - clear f7 [1][5] and f2 [6][5]
+      data.board[1][5] = null;
+      data.board[6][5] = null;
       data.board[0][5] = { type: 'rook', player: 'black' };
 
       const move: Move = { player: 'white', from: 'e1', to: 'g1' };
@@ -420,14 +422,16 @@ describe('ChessService', () => {
   describe('Check Detection', () => {
     it('should not allow moves that leave king in check', () => {
       const data = service.initialGameData(0)[0] as unknown as ChessData;
-      // Place white king in front of black rook with white pawn blocking
+      // Horizontal pin: king at e4 [4][4], pawn at d4 [4][3], rook at a4 [4][0]
       data.board[4][4] = { type: 'king', player: 'white' };
       data.board[7][4] = null;
-      data.board[3][4] = { type: 'pawn', player: 'white' };
-      data.board[0][4] = { type: 'rook', player: 'black' };
+      data.board[4][3] = { type: 'pawn', player: 'white' };
+      data.board[6][3] = null; // Remove original pawn from d2
+      data.board[4][0] = { type: 'rook', player: 'black' };
+      data.board[7][0] = null; // Remove white rook from a1
 
-      // Try to move the blocking pawn
-      const move: Move = { player: 'white', from: 'e5', to: 'e6' };
+      // Try to move the blocking pawn (would expose king to check)
+      const move: Move = { player: 'white', from: 'd4', to: 'd5' };
       expect(service.canPlay(data, move as any)).toBe(false);
     });
   });
